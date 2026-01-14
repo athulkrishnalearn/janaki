@@ -11,6 +11,20 @@ const tokenSchema = z.object({
   expiresIn: z.enum(["never", "7d", "30d", "90d", "1y"]),
 });
 
+// Map permissions to type and allowedOperations
+const mapPermissions = (permission: string) => {
+  switch (permission) {
+    case "read":
+      return { type: "read-only", allowedOperations: JSON.stringify(["read"]) };
+    case "write":
+      return { type: "full-access", allowedOperations: JSON.stringify(["read", "create", "update"]) };
+    case "admin":
+      return { type: "full-access", allowedOperations: JSON.stringify(["read", "create", "update", "delete"]) };
+    default:
+      return { type: "read-only", allowedOperations: JSON.stringify(["read"]) };
+  }
+};
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -55,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data;
+    const permissionMapping = mapPermissions(data.permissions);
 
     // Generate secure random token
     const token = `janaki_${crypto.randomBytes(32).toString("hex")}`;
@@ -83,7 +98,8 @@ export async function POST(request: NextRequest) {
       data: {
         name: data.name,
         token,
-        permissions: data.permissions,
+        type: permissionMapping.type,
+        allowedOperations: permissionMapping.allowedOperations,
         expiresAt,
         organizationId: session.user.organizationId,
       },
