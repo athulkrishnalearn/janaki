@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 // PATCH - Set as default tax rate
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,6 +14,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     // Unset all defaults first
     await prisma.taxRate.updateMany({
       where: {
@@ -26,7 +27,7 @@ export async function PATCH(
     // Set this one as default
     const taxRate = await prisma.taxRate.update({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
       data: {

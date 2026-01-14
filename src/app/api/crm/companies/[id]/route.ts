@@ -24,13 +24,14 @@ const companySchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = companySchema.safeParse(body);
 
@@ -39,7 +40,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const company = await prisma.company.update({
-      where: { id: params.id, organizationId: session.user.organizationId },
+      where: { id: id, organizationId: session.user.organizationId },
       data: validation.data,
     });
 
@@ -50,15 +51,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     await prisma.company.delete({
-      where: { id: params.id, organizationId: session.user.organizationId },
+      where: { id: id, organizationId: session.user.organizationId },
     });
 
     return NextResponse.json({ message: "Company deleted successfully" });

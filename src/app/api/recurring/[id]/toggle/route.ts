@@ -11,7 +11,7 @@ const toggleSchema = z.object({
 // PATCH - Toggle active status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -19,6 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = toggleSchema.safeParse(body);
 
@@ -31,7 +32,7 @@ export async function PATCH(
 
     const expense = await prisma.recurringExpense.update({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
       data: {

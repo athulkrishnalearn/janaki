@@ -16,7 +16,7 @@ const contentTypeSchema = z.object({
 // PUT - Update content type
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -24,6 +24,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = contentTypeSchema.safeParse(body);
 
@@ -38,7 +39,7 @@ export async function PUT(
 
     // Check if it's a system type
     const contentType = await prisma.contentType.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!contentType) {
@@ -57,7 +58,7 @@ export async function PUT(
 
     const updated = await prisma.contentType.update({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
       data: {
@@ -83,7 +84,7 @@ export async function PUT(
 // DELETE - Delete content type
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -91,9 +92,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     // Check if it's a system type
     const contentType = await prisma.contentType.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!contentType) {
@@ -112,7 +114,7 @@ export async function DELETE(
 
     await prisma.contentType.delete({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
     });

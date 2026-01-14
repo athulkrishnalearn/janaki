@@ -10,7 +10,7 @@ const updateSchema = z.object({
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,6 +18,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = updateSchema.safeParse(body);
 
@@ -30,7 +31,7 @@ export async function PUT(
 
     // Verify token belongs to user's organization
     const token = await prisma.apiToken.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!token || token.organizationId !== session.user.organizationId) {
@@ -38,7 +39,7 @@ export async function PUT(
     }
 
     const updated = await prisma.apiToken.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         isActive: validation.data.isActive,
       },
@@ -56,7 +57,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -64,9 +65,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     // Verify token belongs to user's organization
     const token = await prisma.apiToken.findUnique({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     if (!token || token.organizationId !== session.user.organizationId) {
@@ -74,7 +76,7 @@ export async function DELETE(
     }
 
     await prisma.apiToken.delete({
-      where: { id: params.id },
+      where: { id: id },
     });
 
     return NextResponse.json({ success: true });

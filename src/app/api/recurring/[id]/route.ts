@@ -42,7 +42,7 @@ function calculateNextDate(startDate: Date, frequency: string): Date {
 // PUT - Update recurring expense
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -50,6 +50,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = recurringExpenseSchema.safeParse(body);
 
@@ -66,7 +67,7 @@ export async function PUT(
 
     const expense = await prisma.recurringExpense.update({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
       data: {
@@ -101,7 +102,7 @@ export async function PUT(
 // DELETE - Delete recurring expense
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -109,9 +110,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     await prisma.recurringExpense.delete({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
     });

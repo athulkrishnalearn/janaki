@@ -22,7 +22,7 @@ const budgetSchema = z.object({
 // PUT - Update budget
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -30,6 +30,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validation = budgetSchema.safeParse(body);
 
@@ -44,13 +45,13 @@ export async function PUT(
 
     // Delete existing categories
     await prisma.budgetCategory.deleteMany({
-      where: { budgetId: params.id },
+      where: { budgetId: id },
     });
 
     // Update budget with new categories
     const budget = await prisma.budget.update({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
       data: {
@@ -82,7 +83,7 @@ export async function PUT(
 // DELETE - Delete budget
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -90,9 +91,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     await prisma.budget.delete({
       where: {
-        id: params.id,
+        id: id,
         organizationId: session.user.organizationId,
       },
     });
