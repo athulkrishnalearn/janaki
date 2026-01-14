@@ -1,0 +1,1673 @@
+// This is your Prisma schema file
+// JANAKI - Complete Business Management Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== CORE MODELS ====================
+
+model Organization {
+  id                  String   @id @default(cuid())
+  name                String
+  slug                String   @unique
+  logo                String?
+  industry            String?  // education, agency, recruitment, sme
+  address             String?
+  phone               String?
+  website             String?
+  onboardingCompleted Boolean  @default(false)
+  crmIndustry         String?  // Specific CRM industry type
+  crmSettings         String?  // JSON for industry-specific settings
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  roles           Role[]
+  contacts        Contact[]
+  deals           Deal[]
+  pipelines       Pipeline[]
+  customFields    CustomField[]
+  employees       Employee[]
+  timeEntries     TimeEntry[]
+  workTargets     WorkTarget[]
+  tasks           Task[]
+  invoices        Invoice[]
+  expenses        Expense[]
+  transactions    Transaction[]
+  automations     Automation[]
+  categories      Category[]
+  tickets         Ticket[]
+  workflows       Workflow[]
+  apiKeys         ApiKey[]
+  automationRules AutomationRule[]
+  pipelineStageAutomations PipelineStageAutomation[]
+  attendances     Attendance[]
+  leaves          Leave[]
+  salaryComponents SalaryComponent[]
+  payslips        Payslip[]
+  performanceReviews PerformanceReview[]
+  employeeDocuments EmployeeDocument[]
+  announcements   Announcement[]
+  holidays        Holiday[]
+  contactForms    ContactForm[]
+  // Finance relations
+  vendors         Vendor[]
+  bankAccounts    BankAccount[]
+  paymentMethods  PaymentMethod[]
+  recurringExpenses RecurringExpense[]
+  payments        Payment[]
+  budgets         Budget[]
+  taxRates        TaxRate[]
+  financialReports FinancialReport[]
+  // CMS relations
+  contentTypes    ContentType[]
+  contents        Content[]
+  media           Media[]
+  apiTokens       ApiToken[]
+  // Enhanced CRM relations
+  companies       Company[]
+  activities      Activity[]
+  emailThreads    EmailThread[]
+  // Enhanced Task Management
+  projects        Project[]
+  taskTemplates   TaskTemplate[]
+  // Landing Pages & Campaigns
+  landingPages    LandingPage[]
+  campaigns       Campaign[]
+}
+
+// Available functionalities/modules in the system
+model Permission {
+  id          String  @id @default(cuid())
+  name        String  @unique // crm, hr, tasks, finance, automations, assistant, settings
+  label       String // Display name
+  description String?
+  icon        String? // Icon name for UI
+
+  rolePermissions RolePermission[]
+}
+
+// Custom roles created by admin
+model Role {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  isSystem       Boolean  @default(false) // true for admin, managing_admin
+  canManageUsers Boolean  @default(false)
+  canManageRoles Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@unique([organizationId, name])
+}
+
+// Junction table for Role-Permission many-to-many
+model RolePermission {
+  id String @id @default(cuid())
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
+  isActive  Boolean  @default(true)
+  isAdmin   Boolean  @default(false) // Super admin flag
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  roleId String?
+  role   Role?   @relation(fields: [roleId], references: [id])
+
+  // Relations
+  assignedTasks      Task[]             @relation("TaskAssignee")
+  createdTasks       Task[]             @relation("TaskCreator")
+  createdDeals       Deal[]             @relation("DealCreator")
+  ownedDeals         Deal[]             @relation("DealOwner")
+  timeEntries        TimeEntry[]
+  employee           Employee?
+  createdInvoices    Invoice[]          @relation("InvoiceCreator")
+  submittedExpenses  Expense[]          @relation("ExpenseSubmitter")
+  receivedPayments   Payment[]          @relation("PaymentReceiver")
+  messages           ChatMessage[]
+  notifications      Notification[]
+  createdTickets     Ticket[]           @relation("TicketCreator")
+  assignedTickets    Ticket[]           @relation("TicketAssignee")
+  ticketResponses    TicketResponse[]
+  employeeActivities EmployeeActivity[]
+  callRecords        CallRecord[]
+  createdActivities  Activity[]         @relation("ActivityCreator")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String // info, warning, success, error
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==================== TICKET SYSTEM ====================
+
+model Ticket {
+  id           String   @id @default(cuid())
+  ticketNumber String
+  subject      String
+  description  String
+  status       String   @default("open") // open, in-progress, resolved, closed
+  priority     String   @default("medium") // low, medium, high, urgent
+  category     String? // general, technical, billing, feature-request
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  creatorId String
+  creator   User   @relation("TicketCreator", fields: [creatorId], references: [id])
+
+  assigneeId String?
+  assignee   User?   @relation("TicketAssignee", fields: [assigneeId], references: [id])
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  responses TicketResponse[]
+}
+
+model TicketResponse {
+  id         String   @id @default(cuid())
+  message    String
+  isInternal Boolean  @default(false) // For admin-only notes
+  createdAt  DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// ==================== WORKFLOW MODELS ====================
+
+model Workflow {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  roleId          String? // Associated role
+  isActive        Boolean  @default(true)
+  isAutoGenerated Boolean  @default(false)
+  steps           String // JSON array of workflow steps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ==================== CRM MODELS ====================
+
+model Contact {
+  id         String   @id @default(cuid())
+  firstName  String
+  lastName   String
+  email      String?
+  phone      String?
+  companyName String? // Company name as text (for backward compatibility)
+  position   String?
+  status     String   @default("lead") // lead, prospect, customer, inactive
+  source     String? // website, referral, social, etc.
+  notes      String?
+  customData String? // JSON string for custom fields
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  // Relations
+  deals Deal[]
+  tasks Task[]
+  formSubmissions ContactFormSubmission[]
+  activities Activity[]
+  emailThreads EmailThread[]
+  campaignLeads CampaignLead[]
+  
+  @@index([organizationId])
+  @@index([companyId])
+}
+
+model Deal {
+  id                String    @id @default(cuid())
+  title             String
+  value             Float     @default(0)
+  currency          String    @default("USD")
+  status            String    @default("open") // open, won, lost
+  probability       Int       @default(50)
+  expectedCloseDate DateTime?
+  notes             String?
+  customData        String? // JSON for custom fields
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+
+  pipelineId String?
+  pipeline   Pipeline? @relation(fields: [pipelineId], references: [id])
+
+  stageId String?
+  stage   PipelineStage? @relation(fields: [stageId], references: [id])
+
+  creatorId String
+  creator   User   @relation("DealCreator", fields: [creatorId], references: [id])
+
+  ownerId String?
+  owner   User?   @relation("DealOwner", fields: [ownerId], references: [id])
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  tasks Task[]
+  activities Activity[]
+  emailThreads EmailThread[]
+}
+
+model Pipeline {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  stages PipelineStage[]
+  deals  Deal[]
+}
+
+model PipelineStage {
+  id          String @id @default(cuid())
+  name        String
+  order       Int
+  color       String @default("#3b82f6")
+  probability Int    @default(50)
+  
+  // Industry-specific fields
+  description String? // Detailed meaning of this stage
+  requiredFields String? // JSON array of required fields
+  subStatuses String? // JSON array of sub-statuses
+  intent      String? // What this stage really means
+  failureSignals String? // JSON array of warning conditions
+  
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  deals Deal[]
+  automations PipelineStageAutomation[]
+}
+
+model CustomField {
+  id         String   @id @default(cuid())
+  name       String
+  label      String
+  type       String // text, number, date, select, checkbox
+  options    String? // JSON array for select options
+  entity     String // contact, deal, task, employee
+  isRequired Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ==================== CONTACT FORM ====================
+
+model ContactForm {
+  id              String   @id @default(cuid())
+  name            String
+  title           String   @default("Contact Form")
+  description     String?
+  fields          String // JSON array of form fields
+  isActive        Boolean  @default(true)
+  submitCount     Int      @default(0)
+  settings        String? // JSON for customization (colors, logo, etc.)
+  logoUrl         String? // Company logo URL
+  campaignName    String? // Campaign name
+  campaignDetails String? // Campaign description/details
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  submissions ContactFormSubmission[]
+  landingPages LandingPage[]
+}
+
+model ContactFormSubmission {
+  id         String   @id @default(cuid())
+  formData   String // JSON of submitted form data
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  formId String
+  form   ContactForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+}
+
+// ==================== HR MODELS ====================
+
+model Employee {
+  id           String    @id @default(cuid())
+  employeeId   String // Custom employee ID
+  department   String?
+  position     String?
+  salary       Float?
+  hireDate     DateTime?
+  status       String    @default("active") // active, inactive, on-leave, terminated
+  workSchedule String? // JSON for work schedule
+  bankAccount  String? // Bank account details
+  taxId        String? // Tax identification number
+  emergencyContact String? // JSON for emergency contact
+  bloodGroup   String?
+  dateOfBirth  DateTime?
+  address      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  timeEntries TimeEntry[]
+  workTargets WorkTarget[]
+  attendances Attendance[]
+  leaves      Leave[]
+  payslips    Payslip[]
+  salaryComponents SalaryComponent[]
+  documents   EmployeeDocument[]
+  reviews     PerformanceReview[]
+}
+
+model TimeEntry {
+  id           String    @id @default(cuid())
+  date         DateTime
+  clockIn      DateTime?
+  clockOut     DateTime?
+  hoursWorked  Float     @default(0)
+  breakMinutes Int       @default(0)
+  notes        String?
+  status       String    @default("pending") // pending, approved, rejected
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id])
+}
+
+model WorkTarget {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  targetValue  Float
+  currentValue Float    @default(0)
+  unit         String? // hours, tasks, sales, etc.
+  period       String // daily, weekly, monthly, quarterly
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("in-progress") // in-progress, completed, missed
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Attendance Management
+model Attendance {
+  id          String   @id @default(cuid())
+  date        DateTime
+  clockIn     DateTime?
+  clockOut    DateTime?
+  status      String   @default("present") // present, absent, half-day, late, on-leave
+  workHours   Float    @default(0)
+  overtime    Float    @default(0)
+  location    String? // Clock-in location
+  notes       String?
+  isApproved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+}
+
+// Leave Management
+model Leave {
+  id          String   @id @default(cuid())
+  leaveType   String // casual, sick, paid, unpaid, maternity, paternity
+  startDate   DateTime
+  endDate     DateTime
+  days        Float // Number of days
+  reason      String
+  status      String   @default("pending") // pending, approved, rejected
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectionReason String?
+  documents   String? // JSON array of document URLs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+// Salary Components (for payroll calculation)
+model SalaryComponent {
+  id          String   @id @default(cuid())
+  name        String // Basic, HRA, DA, Medical, Bonus, PF, Tax, etc.
+  type        String // earning, deduction
+  amount      Float
+  percentage  Float? // If calculated as percentage of basic
+  isActive    Boolean  @default(true)
+  effectiveFrom DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Payslip Generation
+model Payslip {
+  id              String   @id @default(cuid())
+  month           Int // 1-12
+  year            Int
+  paymentDate     DateTime
+  basicSalary     Float
+  earnings        String // JSON object of all earnings
+  deductions      String // JSON object of all deductions
+  grossSalary     Float
+  netSalary       Float
+  status          String   @default("draft") // draft, published, paid
+  paidOn          DateTime?
+  paymentMode     String? // bank_transfer, cash, cheque
+  transactionId   String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month, year])
+  @@index([status])
+}
+
+// Performance Reviews
+model PerformanceReview {
+  id              String   @id @default(cuid())
+  reviewPeriod    String // Q1-2024, H1-2024, Annual-2024
+  reviewDate      DateTime
+  overallRating   Float // 1-5
+  strengths       String? // JSON array
+  improvements    String? // JSON array
+  goals           String? // JSON array
+  feedback        String?
+  reviewedBy      String
+  status          String   @default("draft") // draft, submitted, acknowledged
+  acknowledgedAt  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+// Employee Documents
+model EmployeeDocument {
+  id           String   @id @default(cuid())
+  name         String
+  type         String // resume, id_proof, address_proof, certificate, contract
+  fileUrl      String
+  fileSize     Int?
+  uploadedAt   DateTime @default(now())
+  expiryDate   DateTime?
+  isVerified   Boolean  @default(false)
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  notes        String?
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+// Company Announcements
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String   @default("general") // general, urgent, policy, event
+  priority    String   @default("normal") // low, normal, high
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  targetDepartments String? // JSON array of departments
+  attachments String? // JSON array of file URLs
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([isPublished])
+}
+
+// Holiday Calendar
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  type        String   @default("public") // public, optional, restricted
+  description String?
+  isRecurring Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+}
+
+// ==================== TASK MODELS ====================
+
+model Task {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  status         String    @default("todo") // todo, in-progress, review, done
+  priority       String    @default("medium") // low, medium, high, urgent
+  dueDate        DateTime?
+  estimatedHours Float?
+  actualHours    Float?
+  tags           String? // JSON array
+  isAutoAssigned Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  creatorId String
+  creator   User   @relation("TaskCreator", fields: [creatorId], references: [id])
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+
+  parentId String?
+  parent   Task?   @relation("SubTasks", fields: [parentId], references: [id])
+  subTasks Task[]  @relation("SubTasks")
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  timeEntries TimeEntry[]
+}
+
+model Category {
+  id    String @id @default(cuid())
+  name  String
+  color String @default("#3b82f6")
+  type  String // task, expense, invoice
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  tasks    Task[]
+  expenses Expense[]
+}
+
+// ==================== FINANCE MODELS ====================
+
+// Vendors/Suppliers Management
+model Vendor {
+  id              String    @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  address         String?
+  contactPerson   String?
+  taxId           String?    // Tax identification number
+  paymentTerms    String?    // e.g., "Net 30", "Due on receipt"
+  bankDetails     String?    // JSON for bank account info
+  category        String?    // e.g., "Office Supplies", "Software", "Utilities"
+  notes           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  expenses        Expense[]
+  recurringExpenses RecurringExpense[]
+
+  @@index([organizationId])
+}
+
+// Bank Accounts
+model BankAccount {
+  id              String   @id @default(cuid())
+  accountName     String
+  accountNumber   String
+  bankName        String
+  accountType     String   @default("checking") // checking, savings, credit_card
+  currency        String   @default("USD")
+  balance         Float    @default(0)
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  transactions    Transaction[]
+
+  @@index([organizationId])
+}
+
+// Payment Methods
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Cash", "Credit Card", "Bank Transfer", "PayPal"
+  type        String   // cash, card, bank_transfer, online
+  details     String?  // JSON for additional info (card last 4 digits, etc.)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  invoiceNumber   String
+  status          String    @default("draft") // draft, sent, paid, overdue, cancelled
+  issueDate       DateTime  @default(now())
+  dueDate         DateTime
+  paidDate        DateTime?
+  subtotal        Float     @default(0)
+  tax             Float     @default(0)
+  discount        Float     @default(0)
+  total           Float     @default(0)
+  paidAmount      Float     @default(0)
+  currency        String    @default("USD")
+  notes           String?
+  terms           String?
+  clientName      String
+  clientEmail     String?
+  clientAddress   String?
+  paymentMethod   String?   // How payment was received
+  referenceNumber String?   // Payment reference/transaction ID
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  creatorId String
+  creator   User   @relation("InvoiceCreator", fields: [creatorId], references: [id])
+
+  items        InvoiceItem[]
+  transactions Transaction[]
+  payments     Payment[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id          String @id @default(cuid())
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float
+  taxRate     Float  @default(0)  // Percentage
+  total       Float
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id              String    @id @default(cuid())
+  description     String
+  amount          Float
+  currency        String    @default("USD")
+  date            DateTime
+  receipt         String?   // URL to receipt image
+  status          String    @default("pending") // pending, approved, rejected, reimbursed
+  paymentMethod   String?   // cash, card, bank_transfer, etc.
+  taxDeductible   Boolean   @default(false)
+  billable        Boolean   @default(false) // Can be billed to client
+  reimbursable    Boolean   @default(false) // Employee reimbursement
+  approvedBy      String?
+  approvedAt      DateTime?
+  paidDate        DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+
+  submittedById String?  // Employee who submitted the expense
+  submittedBy   User?   @relation("ExpenseSubmitter", fields: [submittedById], references: [id])
+
+  transactions Transaction[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([date])
+}
+
+// Recurring Expenses (subscriptions, rent, etc.)
+model RecurringExpense {
+  id              String    @id @default(cuid())
+  description     String
+  amount          Float
+  currency        String    @default("USD")
+  frequency       String    // daily, weekly, monthly, quarterly, yearly
+  startDate       DateTime
+  endDate         DateTime?
+  nextDate        DateTime  // Next occurrence date
+  lastProcessed   DateTime?
+  isActive        Boolean   @default(true)
+  autoApprove     Boolean   @default(false)
+  categoryId      String?
+  vendorId        String?
+  paymentMethod   String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  @@index([organizationId])
+  @@index([isActive])
+  @@index([nextDate])
+}
+
+// Payment Tracking
+model Payment {
+  id              String   @id @default(cuid())
+  amount          Float
+  currency        String   @default("USD")
+  paymentDate     DateTime @default(now())
+  paymentMethod   String   // cash, card, bank_transfer, online, etc.
+  referenceNumber String?  // Transaction/check number
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  receivedById String   // User who recorded the payment
+  receivedBy   User    @relation("PaymentReceiver", fields: [receivedById], references: [id])
+
+  @@index([organizationId])
+  @@index([paymentDate])
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  type            String   // income, expense, transfer
+  amount          Float
+  currency        String   @default("USD")
+  description     String?
+  date            DateTime
+  reference       String?
+  balanceAfter    Float?   // Account balance after transaction
+  createdAt       DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  expenseId String?
+  expense   Expense? @relation(fields: [expenseId], references: [id])
+
+  @@index([organizationId])
+  @@index([date])
+  @@index([type])
+}
+
+// Budget Management
+model Budget {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  period      String   // monthly, quarterly, yearly
+  startDate   DateTime
+  endDate     DateTime
+  totalAmount Float
+  spent       Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  categories BudgetCategory[]
+
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+model BudgetCategory {
+  id           String  @id @default(cuid())
+  categoryName String  // e.g., "Marketing", "Operations", "Salaries"
+  allocated    Float   // Allocated amount for this category
+  spent        Float   @default(0)
+  notes        String?
+
+  budgetId String
+  budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+}
+
+// Tax Settings
+model TaxRate {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Sales Tax", "VAT", "GST"
+  rate        Float    // Percentage (e.g., 10 for 10%)
+  type        String   // sales_tax, vat, gst, income_tax
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Financial Reports (stored snapshots)
+model FinancialReport {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // profit_loss, balance_sheet, cash_flow, tax_summary
+  period      String   // e.g., "Q1 2024", "January 2024"
+  startDate   DateTime
+  endDate     DateTime
+  data        String   // JSON with report data
+  generatedBy String
+  createdAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ==================== AUTOMATION MODELS ====================
+
+model Automation {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  isActive      Boolean   @default(true)
+  triggerType   String // time, event, condition
+  triggerConfig String // JSON config for trigger
+  actions       String // JSON array of actions
+  lastRunAt     DateTime?
+  runCount      Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ==================== CHATBOT MODELS ====================
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  role      String // user, assistant, system
+  metadata  String? // JSON for any additional data
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model ChatConversation {
+  id        String   @id @default(cuid())
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+}
+
+// ==================== API INTEGRATION MODELS ====================
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  name           String // Descriptive name for the key
+  key            String    @unique // The actual API key
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isActive       Boolean   @default(true)
+  permissions    String // JSON array of allowed permissions: ["leads:create", "contacts:read"]
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  webhookLogs WebhookLog[]
+
+  @@index([organizationId])
+  @@index([key])
+}
+
+model WebhookLog {
+  id             String   @id @default(cuid())
+  apiKeyId       String
+  apiKey         ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  endpoint       String // Which endpoint was called
+  method         String // GET, POST, etc.
+  requestBody    String? // JSON request body
+  responseStatus Int // HTTP status code
+  responseBody   String? // JSON response
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+}
+
+model EmployeeActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp  DateTime
+  location   String?
+  callData   Json?
+  screenTime Int? // in seconds
+  lastSync   DateTime @default(now())
+
+  @@unique([userId, timestamp])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model CallRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String
+  duration    Int // in seconds
+  fileName    String
+  fileSize    Int // in bytes
+  mimeType    String
+  callData    Json?
+  audioData   Bytes?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==================== AUTOMATION & INTELLIGENCE MODELS ====================
+
+model AutomationRule {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  trigger        String   // stage_enter, stage_duration, field_change, time_based
+  triggerConfig  String   // JSON config for trigger conditions
+  actions        String   // JSON array of actions to perform
+  industryType   String?  // education, agency, recruitment, sme
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([industryType])
+}
+
+model PipelineStageAutomation {
+  id          String   @id @default(cuid())
+  stageId     String
+  stage       PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  
+  // Automation config
+  triggerType String   // on_enter, on_duration, on_exit
+  duration    Int?     // Minutes to wait (for duration triggers)
+  actions     String   // JSON array of actions
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@index([organizationId])
+}
+
+// ==================== CMS (Content Management System) ====================
+
+// Content Types - Define structure for different content
+model ContentType {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Blog Post", "Product", "Landing Page"
+  apiId       String   // e.g., "blog-post", "product" - used in API URLs
+  description String?
+  icon        String?  // Icon for UI
+  isSystem    Boolean  @default(false) // System types can't be deleted
+  
+  // Schema definition
+  fields      String   // JSON array of field definitions
+  
+  // Settings
+  enableDrafts Boolean @default(true)
+  enableVersioning Boolean @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contents Content[]
+  
+  @@unique([organizationId, apiId])
+  @@index([organizationId])
+}
+
+// Content Entries - Actual content instances
+model Content {
+  id        String   @id @default(cuid())
+  title     String   // Main title/name
+  slug      String   // URL-friendly identifier
+  data      String   // JSON object with all field values
+  
+  // Publishing
+  status    String   @default("draft") // draft, published, archived
+  publishedAt DateTime?
+  
+  // SEO
+  metaTitle String?
+  metaDescription String?
+  metaKeywords String?
+  
+  // Versioning
+  version   Int      @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contentTypeId String
+  contentType   ContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  versions  ContentVersion[]
+  media     ContentMedia[]
+  
+  @@unique([organizationId, contentTypeId, slug])
+  @@index([organizationId])
+  @@index([contentTypeId])
+  @@index([status])
+}
+
+// Content Versions - Track content history
+model ContentVersion {
+  id        String   @id @default(cuid())
+  data      String   // JSON snapshot of content data
+  version   Int
+  createdAt DateTime @default(now())
+  createdBy String   // User ID who created this version
+
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  
+  @@index([contentId])
+}
+
+// Media Library
+model Media {
+  id          String   @id @default(cuid())
+  name        String
+  fileName    String
+  fileUrl     String
+  mimeType    String
+  fileSize    Int      // In bytes
+  width       Int?     // For images
+  height      Int?     // For images
+  alt         String?  // Alt text for images
+  folder      String?  // Folder path for organization
+  uploadedBy  String   // User ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contentMedia ContentMedia[]
+  
+  @@index([organizationId])
+  @@index([mimeType])
+}
+
+// Junction table for Content-Media relationship
+model ContentMedia {
+  id        String @id @default(cuid())
+  
+  contentId String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  
+  mediaId   String
+  media     Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  
+  fieldName String // Which field this media belongs to
+  order     Int    @default(0)
+  
+  @@unique([contentId, mediaId, fieldName])
+  @@index([contentId])
+  @@index([mediaId])
+}
+
+// API Access Tokens for headless CMS
+model ApiToken {
+  id          String   @id @default(cuid())
+  name        String
+  token       String   @unique
+  type        String   @default("read-only") // read-only, full-access
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  isActive    Boolean  @default(true)
+  
+  // Permissions
+  allowedContentTypes String? // JSON array of content type IDs, null = all
+  allowedOperations   String? // JSON array: ["read", "create", "update", "delete"]
+  
+  createdAt   DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@index([organizationId])
+  @@index([token])
+}
+
+// ==================== ENHANCED CRM MODELS ====================
+
+// Company/Account Management
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  website     String?
+  industry    String?
+  size        String?  // employees count range
+  revenue     Float?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  phone       String?
+  email       String?
+  
+  // Status & Classification
+  type        String?  @default("prospect") // prospect, customer, partner, vendor
+  status      String   @default("active") // active, inactive
+  priority    String?  @default("medium") // low, medium, high
+  
+  // Social & Additional
+  linkedinUrl String?
+  twitterHandle String?
+  
+  notes       String?
+  customData  String?  // JSON for custom fields
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  contacts    Contact[]
+  deals       Deal[]
+  activities  Activity[]
+  
+  @@index([organizationId])
+  @@index([type])
+  @@index([status])
+}
+
+// Activities/Interactions tracking
+model Activity {
+  id          String   @id @default(cuid())
+  type        String   // call, email, meeting, note, task
+  subject     String
+  description String?
+  
+  // Activity details
+  duration    Int?     // In minutes
+  outcome     String?  // successful, follow-up-needed, no-answer, etc.
+  
+  // Scheduling
+  scheduledAt DateTime?
+  completedAt DateTime?
+  
+  // Status
+  status      String   @default("completed") // scheduled, completed, cancelled
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations - activities can be linked to contacts, companies, or deals
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+  
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  
+  createdById String
+  createdBy   User   @relation("ActivityCreator", fields: [createdById], references: [id])
+  
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([type])
+  @@index([status])
+}
+
+// Email Integration
+model EmailThread {
+  id          String   @id @default(cuid())
+  subject     String
+  participants String  // JSON array of email addresses
+  messageCount Int     @default(0)
+  lastMessageAt DateTime
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+  
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  
+  emails EmailMessage[]
+  
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([dealId])
+}
+
+model EmailMessage {
+  id          String   @id @default(cuid())
+  from        String
+  to          String   // JSON array
+  cc          String?  // JSON array
+  bcc         String?  // JSON array
+  subject     String
+  body        String
+  htmlBody    String?
+  isRead      Boolean  @default(false)
+  sentAt      DateTime
+  
+  attachments String?  // JSON array of attachment URLs
+  
+  createdAt   DateTime @default(now())
+
+  threadId String
+  thread   EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  @@index([threadId])
+}
+
+// ==================== ENHANCED TASK MANAGEMENT ====================
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Status & Progress
+  status      String   @default("active") // active, on-hold, completed, cancelled
+  progress    Int      @default(0) // 0-100
+  
+  // Dates
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  // Budget
+  budget      Float?
+  
+  color       String?  @default("#3b82f6")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  tasks       Task[]
+  milestones  Milestone[]
+  
+  @@index([organizationId])
+  @@index([status])
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  dueDate     DateTime
+  status      String   @default("pending") // pending, completed
+  completedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+}
+
+model TaskTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Template data
+  taskData    String   // JSON with default task properties
+  
+  // Categorization
+  category    String?  // onboarding, sales-follow-up, etc.
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@index([organizationId])
+}
+
+// ==================== LANDING PAGE & CAMPAIGN MODELS ====================
+
+model LandingPage {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   // URL path
+  title       String
+  description String?
+  
+  // Design & Content
+  template    String   @default("default")
+  content     String   // JSON with page sections
+  
+  // Branding
+  logoUrl     String?
+  primaryColor String?  @default("#3b82f6")
+  secondaryColor String? @default("#1e40af")
+  
+  // SEO
+  metaTitle   String?
+  metaDescription String?
+  metaKeywords String?
+  
+  // Settings
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  
+  // Analytics
+  viewCount   Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  campaignId String?   @unique
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  
+  formId     String?
+  form       ContactForm? @relation(fields: [formId], references: [id])
+  
+  analytics  PageAnalytics[]
+  
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([isPublished])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Campaign details
+  type        String?  // email, social, paid-ads, content
+  status      String   @default("draft") // draft, active, paused, completed
+  
+  // Budget & Goals
+  budget      Float?
+  goal        String?  // leads, sales, awareness
+  targetCount Int?
+  
+  // Dates
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  // Tracking
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  landingPage LandingPage?
+  leads       CampaignLead[]
+  
+  @@index([organizationId])
+  @@index([status])
+}
+
+model CampaignLead {
+  id          String   @id @default(cuid())
+  
+  // Lead source tracking
+  sourceUrl   String?
+  referrer    String?
+  utmParams   String?  // JSON
+  
+  // Device info
+  device      String?
+  browser     String?
+  ipAddress   String?
+  
+  createdAt   DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id])
+  
+  @@index([campaignId])
+  @@index([contactId])
+}
+
+model PageAnalytics {
+  id          String   @id @default(cuid())
+  
+  // Visitor info
+  sessionId   String
+  ipAddress   String?
+  userAgent   String?
+  
+  // Interaction
+  timeOnPage  Int?     // Seconds
+  scrollDepth Int?     // Percentage
+  
+  // Conversion
+  converted   Boolean  @default(false)
+  
+  visitedAt   DateTime @default(now())
+
+  landingPageId String
+  landingPage   LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  
+  @@index([landingPageId])
+  @@index([sessionId])
+}

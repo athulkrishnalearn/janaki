@@ -1,0 +1,32 @@
+model CallRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String
+  duration    Int      // in seconds
+  fileName    String
+  fileSize    Int      // in bytes
+  mimeType    String
+  callData    Json?
+  audioData   Bytes?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model EmployeeActivity {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp   DateTime
+  location    String?
+  callData    Json?
+  screenTime  Int? // in seconds
+  lastSync    DateTime @default(now())
+  
+  @@unique([userId, timestamp])
+  @@index([userId])
+  @@index([timestamp])
+}

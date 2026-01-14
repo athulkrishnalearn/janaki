@@ -1,0 +1,124 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+import { z } from "zod";
+
+const recurringExpenseSchema = z.object({
+  description: z.string().min(1),
+  amount: z.number().positive(),
+  frequency: z.enum(["daily", "weekly", "monthly", "quarterly", "yearly"]),
+  startDate: z.string(),
+  endDate: z.string().optional().nullable(),
+  paymentMethod: z.string().optional().nullable(),
+  vendorId: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  autoApprove: z.boolean().optional(),
+});
+
+// Helper function to calculate next date
+function calculateNextDate(startDate: Date, frequency: string): Date {
+  const next = new Date(startDate);
+  switch (frequency) {
+    case "daily":
+      next.setDate(next.getDate() + 1);
+      break;
+    case "weekly":
+      next.setDate(next.getDate() + 7);
+      break;
+    case "monthly":
+      next.setMonth(next.getMonth() + 1);
+      break;
+    case "quarterly":
+      next.setMonth(next.getMonth() + 3);
+      break;
+    case "yearly":
+      next.setFullYear(next.getFullYear() + 1);
+      break;
+  }
+  return next;
+}
+
+// PUT - Update recurring expense
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validation = recurringExpenseSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
+    const data = validation.data;
+    const startDate = new Date(data.startDate);
+    const nextDate = calculateNextDate(startDate, data.frequency);
+
+    const expense = await prisma.recurringExpense.update({
+      where: {
+        id: params.id,
+        organizationId: session.user.organizationId,
+      },
+      data: {
+        description: data.description,
+        amount: data.amount,
+        frequency: data.frequency,
+        startDate: startDate,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        nextDate: nextDate,
+        paymentMethod: data.paymentMethod || null,
+        vendorId: data.vendorId || null,
+        notes: data.notes || null,
+        autoApprove: data.autoApprove || false,
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(expense);
+  } catch (error) {
+    console.error("Error updating recurring expense:", error);
+    return NextResponse.json({ error: "Failed to update recurring expense" }, { status: 500 });
+  }
+}
+
+// DELETE - Delete recurring expense
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await prisma.recurringExpense.delete({
+      where: {
+        id: params.id,
+        organizationId: session.user.organizationId,
+      },
+    });
+
+    return NextResponse.json({ message: "Recurring expense deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting recurring expense:", error);
+    return NextResponse.json({ error: "Failed to delete recurring expense" }, { status: 500 });
+  }
+}

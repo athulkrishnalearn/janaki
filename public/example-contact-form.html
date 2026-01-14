@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Form - JANAKI Integration Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #1a202c;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #718096;
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #2d3748;
+            font-size: 14px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .config-note {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            color: #78350f;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .config-note strong {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .config-note code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-card">
+            <h1>Get in Touch</h1>
+            <p class="subtitle">Fill out the form below and we'll get back to you soon!</p>
+
+            <!-- Configuration Note -->
+            <div class="config-note">
+                <strong>⚙️ Configuration Required:</strong>
+                Replace <code>YOUR_API_KEY_HERE</code> and <code>YOUR_JANAKI_URL</code> in the JavaScript code below with your actual API key and JANAKI instance URL.
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="alert alert-success hidden">
+                Thank you! Your message has been sent successfully. We'll get back to you soon.
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="alert alert-error hidden">
+                Oops! Something went wrong. Please try again.
+            </div>
+
+            <!-- Contact Form -->
+            <form id="contactForm">
+                <div class="form-group">
+                    <label for="firstName">First Name *</label>
+                    <input type="text" id="firstName" name="firstName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="lastName">Last Name *</label>
+                    <input type="text" id="lastName" name="lastName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone">
+                </div>
+
+                <div class="form-group">
+                    <label for="company">Company</label>
+                    <input type="text" id="company" name="company">
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message"></textarea>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Send Message
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ⚙️ CONFIGURATION - Replace these with your actual values
+        const JANAKI_API_KEY = 'YOUR_API_KEY_HERE';  // Get this from JANAKI Settings > API Keys
+        const JANAKI_URL = 'YOUR_JANAKI_URL';        // Your JANAKI instance URL (e.g., https://yourapp.com)
+
+        const form = document.getElementById('contactForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Disable button and show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            
+            // Hide previous messages
+            successMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+
+            // Get form data
+            const formData = new FormData(form);
+            const data = {
+                firstName: formData.get('firstName'),
+                lastName: formData.get('lastName'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                company: formData.get('company'),
+                message: formData.get('message'),
+                source: 'website' // Track where this lead came from
+            };
+
+            try {
+                // Send to JANAKI CRM
+                const response = await fetch(`${JANAKI_URL}/api/public/leads`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': JANAKI_API_KEY
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Show success message
+                    successMessage.classList.remove('hidden');
+                    form.reset();
+                    
+                    // Optional: Track conversion with Google Analytics, Facebook Pixel, etc.
+                    // gtag('event', 'conversion', { 'send_to': 'AW-CONVERSION_ID' });
+                } else {
+                    throw new Error(result.error || 'Failed to submit form');
+                }
+            } catch (error) {
+                console.error('Form submission error:', error);
+                errorMessage.textContent = error.message || 'Something went wrong. Please try again.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Message';
+            }
+        });
+
+        // Optional: Auto-hide success message after 5 seconds
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (!successMessage.classList.contains('hidden')) {
+                    setTimeout(() => {
+                        successMessage.classList.add('hidden');
+                    }, 5000);
+                }
+            });
+        });
+        
+        observer.observe(successMessage, { 
+            attributes: true, 
+            attributeFilter: ['class'] 
+        });
+    </script>
+</body>
+</html>
