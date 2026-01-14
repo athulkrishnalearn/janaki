@@ -8,7 +8,7 @@ const expenseSchema = z.object({
   description: z.string().min(1),
   amount: z.number().min(0),
   date: z.string(),
-  vendor: z.string().optional(),
+  vendorId: z.string().optional(),
   categoryId: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -76,13 +76,13 @@ export async function POST(request: NextRequest) {
         description: data.description,
         amount: data.amount,
         date: new Date(data.date),
-        vendor: data.vendor,
+        vendorId: data.vendorId || null,
         categoryId: data.categoryId || null,
         notes: data.notes,
         status: "pending",
         organizationId: session.user.organizationId,
       },
-      include: { category: true },
+      include: { category: true, vendor: true },
     });
 
     return NextResponse.json(expense, { status: 201 });

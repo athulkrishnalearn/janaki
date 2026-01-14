@@ -9,7 +9,7 @@ const updateContactSchema = z.object({
   lastName: z.string().min(1).optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
-  company: z.string().optional(),
+  companyName: z.string().optional(),
   position: z.string().optional(),
   status: z.enum(["lead", "prospect", "customer", "inactive"]).optional(),
   source: z.string().optional(),
@@ -86,7 +86,15 @@ export async function PUT(
     const contact = await prisma.contact.update({
       where: { id },
       data: {
-        ...validation.data,
+        firstName: validation.data.firstName,
+        lastName: validation.data.lastName,
+        email: validation.data.email,
+        phone: validation.data.phone,
+        companyName: validation.data.companyName,
+        position: validation.data.position,
+        status: validation.data.status,
+        source: validation.data.source,
+        notes: validation.data.notes,
         customData: validation.data.customData
           ? JSON.stringify(validation.data.customData)
           : undefined,

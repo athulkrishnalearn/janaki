@@ -48,16 +48,17 @@ export async function POST(request: NextRequest) {
     // In a real implementation, you would upload to cloud storage (S3, Cloudinary, etc.)
     // For now, we'll create a placeholder URL
     const fileName = file.name;
-    const url = `/uploads/${Date.now()}-${fileName}`;
+    const fileUrl = `/uploads/${Date.now()}-${fileName}`;
 
     const media = await prisma.media.create({
       data: {
+        name: title || fileName,
         fileName,
-        url,
+        fileUrl,
         mimeType: file.type,
-        size: file.size,
-        title: title || null,
+        fileSize: file.size,
         alt: alt || null,
+        uploadedBy: session.user.id,
         organizationId: session.user.organizationId,
       },
     });

@@ -35,12 +35,12 @@ import { format } from "date-fns";
 
 interface Media {
   id: string;
-  filename: string;
-  url: string;
+  name: string;
+  fileName: string;
+  fileUrl: string;
   mimeType: string;
-  size: number;
+  fileSize: number;
   alt: string | null;
-  title: string | null;
   createdAt: string;
 }
 
@@ -251,8 +251,8 @@ export default function MediaLibraryPage() {
                       <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
                         {media.mimeType.startsWith("image/") ? (
                           <img
-                            src={media.url}
-                            alt={media.alt || media.filename}
+                            src={media.fileUrl}
+                            alt={media.alt || media.fileName}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -261,7 +261,7 @@ export default function MediaLibraryPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium">{media.title || media.filename}</div>
+                      <div className="font-medium">{media.name}</div>
                       {media.alt && (
                         <div className="text-xs text-muted-foreground">{media.alt}</div>
                       )}
@@ -269,14 +269,14 @@ export default function MediaLibraryPage() {
                     <TableCell>
                       <Badge variant="outline">{media.mimeType}</Badge>
                     </TableCell>
-                    <TableCell>{formatFileSize(media.size)}</TableCell>
+                    <TableCell>{formatFileSize(media.fileSize)}</TableCell>
                     <TableCell>{format(new Date(media.createdAt), "MMM d, yyyy")}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(media.url, "_blank")}
+                          onClick={() => window.open(media.fileUrl, "_blank")}
                         >
                           View
                         </Button>
