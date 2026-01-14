@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         lastName: leadData.data.lastName,
         email: leadData.data.email || null,
         phone: leadData.data.phone || null,
-        company: leadData.data.company || null,
+        companyName: leadData.data.company || null,
         notes: leadData.data.message || null,
         status: "lead",
         source: leadData.data.source,
